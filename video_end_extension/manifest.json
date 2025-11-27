@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Stream Video End Detector",
+  "version": "0.3",
+  "description": "Notify local app when a short/reel/tiktok ends or loops.",
+  "background": { "service_worker": "bg.js" },
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.youtu.be/*",
+    "*://*.instagram.com/*",
+    "*://*.tiktok.com/*",
+    "*://vm.tiktok.com/*",
+    "http://127.0.0.1/*"
+  ],
+  "content_scripts": [{
+    "matches": [
+      "*://*.youtube.com/*",
+      "*://*.youtu.be/*",
+      "*://*.instagram.com/*",
+      "*://*.tiktok.com/*",
+      "*://vm.tiktok.com/*"
+    ],
+    "js": ["content.js"],
+    "run_at": "document_idle",
+    "all_frames": true
+  }]
+}

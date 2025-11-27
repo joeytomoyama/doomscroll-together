@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "dotenv": "^17.2.3",
-    "playwright": "^1.56.1",
-    "tmi.js": "^1.8.5"
-  }
-}
