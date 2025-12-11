@@ -1,0 +1,18 @@
+Option 1: Using wmctrl (simpler)
+Install it first:
+
+sudo apt install wmctrl
+
+Then modify the open_in_firefox function:
+
+async def open_in_firefox(url: str):
+    try:
+        subprocess.Popen(BROWSER_CMD + [url])
+        print(f"[OPEN] {url}")
+        # Give Firefox a moment to create the window, then focus it
+        await asyncio.sleep(0.5)
+        subprocess.run(["wmctrl", "-a", "firefox"], stderr=subprocess.DEVNULL)
+    except FileNotFoundError:
+        print("[ERROR] Firefox command not found. Adjust BROWSER_CMD.")
+    except Exception as e:
+        print(f"[ERROR] Failed to open URL: {e}")
