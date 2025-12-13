@@ -1,15 +1,11 @@
 import asyncio, ssl, random, re, subprocess, time
 
-from db.database import init_db, Chatter, Link
+from db.database import init_db, Chatter, Link, Vote
 import store
 
 # ====== CONFIG ======
 CHANNEL = "doomscrolltogether"  # <-- no leading '#'
 
-# Command to open a tab in Firefox.
-# Linux: ["firefox", "--new-tab"]; Windows: r"C:\Program Files\Mozilla Firefox\firefox.exe", "-new-tab"
-# macOS: ["open", "-a", "Firefox"]  (macOS doesn't need --new-tab; 'open' asks Firefox to open the URL)
-BROWSER_CMD = ["firefox", "--new-tab"]
 # ====================
 
 HOST = "irc.chat.twitch.tv"
@@ -40,6 +36,37 @@ def is_valid_doom_url(url: str) -> bool:
         return True
     
     return False
+
+def handle_vote_or_link(text: str):
+    try:
+        msg = text.split("PRIVMSG", 1)[1].split(":", 1)[1]
+        print(f"[MSG] {msg}")
+
+        username = text.split("!", 1)[0][1:]  # Extract username
+    except Exception:
+        return
+
+    # get chatter from db
+    chatter = Chatter.get_or_create(username=username)[0]
+
+    # check if vote
+    if msg.lower() == "w" or msg.lower() == "l":
+        is_upvote = msg.lower() == "w"
+        vote, created = Vote.get_or_create(chatter=chatter, defaults={'is_upvote': is_upvote})
+        # update chatter's w_count or l_count
+        if created:
+            if is_upvote:
+                chatter.w_count += 1
+            else:
+                chatter.l_count += 1
+            chatter.save()
+        
+    valid = is_valid_doom_url(msg)
+    if not valid:
+        return
+    
+    Link.create(url=msg, posted_by=chatter)
+
 
 async def irc_reader(channel: str):
     ctx = ssl.create_default_context()
@@ -78,23 +105,7 @@ async def irc_reader(channel: str):
 
             # PRIVMSG format: :user!user@user.tmi.twitch.tv PRIVMSG #channel :message...
             if "PRIVMSG" in text:
-                try:
-                    msg = text.split("PRIVMSG", 1)[1].split(":", 1)[1]
-                except Exception:
-                    continue
-
-                print(f"[MSG] {msg}")
-                valid = is_valid_doom_url(msg)
-                if not valid:
-                    continue
-
-                # await open_in_firefox(msg)
-                # store.WAITLIST.add(msg)
-                user = text.split("!", 1)[0][1:]  # Extract username
-                # if user doesn't exist in db, create them
-                user, _created = Chatter.get_or_create(username=user)
-                # store.CURRENT_CHATTER = user
-                Link.create(url=msg, posted_by=user)
+                handle_vote_or_link(text)
     finally:
         writer.close()
         with contextlib.suppress(Exception):

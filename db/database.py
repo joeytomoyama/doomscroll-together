@@ -1,4 +1,4 @@
-from peewee import Model, SqliteDatabase, CharField, DateTimeField, ForeignKeyField, BooleanField
+from peewee import Model, SqliteDatabase, CharField, DateTimeField, ForeignKeyField, BooleanField, IntegerField
 import os
 import datetime
 
@@ -12,8 +12,8 @@ class BaseModel(Model):
 
 class Chatter(BaseModel):
     username = CharField(unique=True)
-    w_count = CharField(default='0')
-    l_count = CharField(default='0')
+    w_count = IntegerField(default=0)
+    l_count = IntegerField(default=0)
     is_banned = BooleanField(default=False)
 
 class Link(BaseModel):
@@ -22,10 +22,15 @@ class Link(BaseModel):
     posted_at = DateTimeField(default=datetime.datetime.now)
     opened_at = DateTimeField(null=True, default=None)
 
+class Vote(BaseModel):
+    # link = ForeignKeyField(Link, backref='votes')
+    chatter = ForeignKeyField(Chatter, backref='votes')
+    is_upvote = BooleanField()
+
 # Initialize database and create tables
 def init_db():
     db.connect()
-    db.create_tables([Chatter, Link], safe=True)
+    db.create_tables([Chatter, Link, Vote], safe=True)
     print("[DB] Database initialized")
 
 if __name__ == "__main__":
