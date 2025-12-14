@@ -12,9 +12,9 @@ class BaseModel(Model):
 
 class Chatter(BaseModel):
     username = CharField(unique=True)
+    user_id = CharField(null=True)
     w_count = IntegerField(default=0)
     l_count = IntegerField(default=0)
-    is_banned = BooleanField(default=False)
 
 class Link(BaseModel):
     url = CharField()

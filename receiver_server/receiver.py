@@ -3,8 +3,8 @@ import random
 
 from flask import Flask, request # global flask installation
 
-import robot
-import store
+from src import robot
+from src import store
 from db.database import Chatter, Link, Vote
 
 app = Flask(__name__)

@@ -29,25 +29,42 @@ def is_valid_doom_url(url: str) -> bool:
 
     # Match against each pattern
     if re.match(youtube_pattern, url):
+        print("[VALID] YouTube Shorts URL detected.")
         return True # add proper short form content and like count check
     elif re.match(instagram_pattern, url):
+        print("[VALID] Instagram Reels URL detected.")
         return True
     elif re.match(tiktok_pattern, url):
+        print("[VALID] TikTok URL detected.")
         return True
     
+    print("[INVALID] URL is not a valid Doomscroll source.")
     return False
 
-def handle_vote_or_link(text: str):
+def get_twitch_value(raw, key):
     try:
-        msg = text.split("PRIVMSG", 1)[1].split(":", 1)[1]
-        print(f"[MSG] {msg}")
+        tag_section = raw.split(' ', 1)[0]
+        for tag in tag_section.lstrip('@').split(';'):
+            if tag.startswith(key + "="):
+                return tag.split("=", 1)[1]
+    except IndexError:
+        pass
+    return None
 
-        username = text.split("!", 1)[0][1:]  # Extract username
-    except Exception:
-        return
+def get_twitch_msg(raw):
+    try:
+        return raw.split("PRIVMSG", 1)[1].split(":", 1)[1]
+    except IndexError:
+        return ""
+
+def handle_vote_or_link(text: str):
+    username = get_twitch_value(text, "display-name") or "unknown_user"
+    user_id = get_twitch_value(text, "user-id") or ""
+    msg = get_twitch_msg(text).strip()
 
     # get chatter from db
-    chatter = Chatter.get_or_create(username=username)[0]
+    chatter = Chatter.get_or_create(username=username, defaults={'user_id': user_id})[0]
+    print(f"[CHATTER] {chatter.username} (W:{chatter.w_count} L:{chatter.l_count})")
 
     # check if vote
     if msg.lower() == "w" or msg.lower() == "l":
@@ -57,8 +74,10 @@ def handle_vote_or_link(text: str):
         if created:
             if is_upvote:
                 chatter.w_count += 1
+                print(f"[VOTE] {chatter.username} voted W (total W: {chatter.w_count})")
             else:
                 chatter.l_count += 1
+                print(f"[VOTE] {chatter.username} voted L (total L: {chatter.l_count})")
             chatter.save()
         
     valid = is_valid_doom_url(msg)
