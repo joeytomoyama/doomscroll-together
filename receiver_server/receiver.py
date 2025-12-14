@@ -6,6 +6,7 @@ from flask import Flask, request # global flask installation
 from src import robot
 from src import store
 from db.database import Chatter, Link, Vote
+from obs.writer import write_chatter, write_chatter_up, write_chatter_down, write_link_up, write_link_down
 
 app = Flask(__name__)
 
@@ -43,7 +44,11 @@ def sample():
         return {"status": "no_link"}
     
     robot.open_in_firefox(link.url)
-    store.CURRENT_CHATTER = link.posted_by if link.posted_by else ""
+    username = link.posted_by.username if link.posted_by else "unknown_user"
+    print(f"[SAMPLE] Opening link: {link.url} posted by {username}")
+    write_chatter(username)
+    store.CURRENT_CHATTER = username
+    store.CURRENT_LINK = link
     reset_votes()
 
     return {"status": "ok"}

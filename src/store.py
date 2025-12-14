@@ -1,1 +1,3 @@
 CURRENT_CHATTER = None
+CURRENT_LINK = None
+ACTIVE = False

@@ -1,7 +1,8 @@
 import asyncio, ssl, random, re, subprocess, time
 
 from db.database import init_db, Chatter, Link, Vote
-import store
+from src import store
+from obs.writer import write_chatter, write_chatter_up, write_chatter_down, write_link_up, write_link_down
 
 # ====== CONFIG ======
 CHANNEL = "doomscrolltogether"  # <-- no leading '#'
@@ -68,6 +69,10 @@ def handle_vote_or_link(text: str):
 
     # check if vote
     if msg.lower() == "w" or msg.lower() == "l":
+        if not store.ACTIVE:
+            print(f"[VOTE] Ignored vote from {chatter.username} because not ACTIVE.")
+            return
+        
         is_upvote = msg.lower() == "w"
         vote, created = Vote.get_or_create(chatter=chatter, defaults={'is_upvote': is_upvote})
         # update chatter's w_count or l_count
@@ -75,16 +80,16 @@ def handle_vote_or_link(text: str):
             if is_upvote:
                 chatter.w_count += 1
                 print(f"[VOTE] {chatter.username} voted W (total W: {chatter.w_count})")
+                write_chatter_up(chatter.w_count)
             else:
                 chatter.l_count += 1
                 print(f"[VOTE] {chatter.username} voted L (total L: {chatter.l_count})")
+                write_chatter_down(chatter.l_count)
             chatter.save()
         
     valid = is_valid_doom_url(msg)
-    if not valid:
-        return
-    
-    Link.create(url=msg, posted_by=chatter)
+    if valid:
+        Link.create(url=msg, posted_by=chatter)
 
 
 async def irc_reader(channel: str):
