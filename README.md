@@ -1,6 +1,32 @@
 # doomscroll-together
 doomscroll together
 
+## Setup & Running
+
+**Install dependencies:**
+```bash
+uv sync
+```
+
+**Activate virtual environment (optional):**
+```bash
+source .venv/bin/activate
+```
+
+**Start the main app:**
+```bash
+python3 -m src.main
+# or with uv:
+uv run python3 -m src.main
+```
+
+**Start the receiver Flask server:**
+```bash
+python3 -m receiver_server.receiver
+# or with uv:
+uv run python3 -m receiver_server.receiver
+```
+
 ## Quick Reference
 
 **Peewee (SQLite) basics**

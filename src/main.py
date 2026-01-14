@@ -4,6 +4,10 @@ from db.database import init_db, Chatter, Link, Vote
 from src import store
 from obs.writer import write_chatter, write_chatter_up, write_chatter_down, write_link_up, write_link_down
 
+from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
+import time
+
 # ====== CONFIG ======
 CHANNEL = "doomscrolltogether"  # <-- no leading '#'
 
@@ -11,6 +15,56 @@ CHANNEL = "doomscrolltogether"  # <-- no leading '#'
 
 HOST = "irc.chat.twitch.tv"
 PORT = 6697  # TLS
+
+
+def valid_like_count(url: str, platform: str) -> bool:
+    """
+    Returns True if the video passes the like threshold
+    (anti self-promo filter), False otherwise.
+
+    platform: "youtube", "tiktok", or "instagram"
+    """
+
+    MIN_LIKES = 5000
+    MIN_AGE_HOURS = 6  # optional but recommended
+
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        # "runtime": ["node"],
+    }
+
+    # Instagram benefits greatly from cookies
+    if platform == "instagram":
+        ydl_opts["cookiesfrombrowser"] = ("firefox",) # type: ignore
+
+    try:
+        with YoutubeDL(ydl_opts) as ydl: # type: ignore
+            info = ydl.extract_info(url, download=False)
+    except DownloadError:
+        return False
+
+    likes = info.get("like_count")
+    timestamp = info.get("timestamp")
+
+    print(f"[CHECK] {platform.capitalize()} video has {likes} likes and timestamp {timestamp}.")
+
+    # Missing or invalid like count → fail
+    if not isinstance(likes, int):
+        return False
+
+    if likes < MIN_LIKES:
+        return False
+
+    # Optional age gate (strongly recommended)
+    if timestamp:
+        age_hours = (time.time() - timestamp) / 3600
+        if age_hours < MIN_AGE_HOURS:
+            return False
+
+    return True
+
 
 def is_valid_doom_url(url: str) -> bool:
     # Normalize URL: Remove "https://", "http://", and "www."
@@ -140,6 +194,9 @@ def main():
     try:
         init_db()
         asyncio.run(irc_reader(CHANNEL.lower()))
+        # print(valid_like_count("https://www.instagram.com/reels/DSM51Z8Afsl/", "instagram"))
+        # print(valid_like_count("https://www.tiktok.com/@gemmagottardi/video/7563995786871082262", "tiktok"))
+        # print(valid_like_count("https://www.youtube.com/shorts/520JzVVudaI", "youtube"))
     except KeyboardInterrupt:
         print("\n[STOP] Bye.")
 
