@@ -2,8 +2,12 @@ import pyautogui
 import time
 import random
 import subprocess
+# import sleep
+from time import sleep
+import math
 
 BROWSER_CMD = ["firefox", "--new-tab"]
+# TODO: programmatically focus firefox with xdotool if needed
 
 # Enable pyautogui failsafe
 # pyautogui.FAILSAFE = True
@@ -11,45 +15,79 @@ BROWSER_CMD = ["firefox", "--new-tab"]
 SAFETY_PAUSE = 0.1
 
 
+# def openURLLikeHuman(url: str, time_seconds: float):
+#     """
+#     Type out a URL with human-like inconsistency.
+
+#     The typing speed varies throughout, with pauses between characters,
+#     but the total typing time equals time_seconds.
+#     """
+#     time.sleep(SAFETY_PAUSE)
+
+#     char_count = len(url)
+#     if char_count == 0 or time_seconds <= 0:
+#         return
+
+#     # Focus address bar
+#     pyautogui.hotkey('ctrl', 'l')
+#     time.sleep(0.2)
+
+#     # --- Generate human-like random delays ---
+#     # Base random weights (not yet time-based)
+#     delays = []
+#     for _ in range(char_count):
+#         weight = random.uniform(0.1, 3.0)
+
+#         # Occasional thinking pause
+#         if random.random() < 0.1:
+#             weight *= random.uniform(5.0, 8.0)
+
+#         delays.append(weight)
+
+#     # Normalize delays so total equals time_seconds
+#     total_weight = sum(delays)
+#     delays = [(d / total_weight) * time_seconds for d in delays]
+
+#     # --- Type characters with computed delays ---
+#     for char, delay in zip(url, delays):
+#         pyautogui.typewrite(char)   # no internal interval
+#         time.sleep(delay)
+#         print(delay)
+
+#     pyautogui.press('enter')
+
 def openURLLikeHuman(url: str, time_seconds: float):
-    """
-    Type out a URL with human-like inconsistency.
-    
-    The typing speed varies throughout, with pauses between characters
-    spread across the total time specified.
-    
-    Args:
-        url: The URL string to type
-        time_seconds: Total time in seconds to spend typing the URL
-    """
     time.sleep(SAFETY_PAUSE)
-    
+
     char_count = len(url)
-    if char_count == 0:
+    if char_count == 0 or time_seconds <= 0:
         return
-    
-    # Calculate base interval between characters
-    base_interval = time_seconds / char_count
 
-    # hot key control L
     pyautogui.hotkey('ctrl', 'l')
-    time.sleep(0.2)  # brief pause after focusing address bar
-    
-    for char in url:
-        # Add random variation to typing speed (±50% of base interval)
-        variation = random.uniform(0.5, 1.5)
-        interval = base_interval * variation
-        
-        # Occasionally add longer pauses (like thinking)
-        if random.random() < 0.1:  # 10% chance of longer pause
-            interval *= random.uniform(1.5, 3.0)
-        
-        # Type the character
-        pyautogui.typewrite(char, interval=0.05)
-        
-        # Sleep for the calculated interval
-        time.sleep(interval)
+    time.sleep(SAFETY_PAUSE)
 
+    # Generate human-like delay weights (log-normal)
+    delays = [
+        random.lognormvariate(mu=-1.4, sigma=2.4)
+        for _ in range(char_count)
+    ]
+
+    # Occasional extreme pauses
+    for i in range(char_count):
+        if random.random() < 0.05:
+            delays[i] *= random.uniform(4.0, 6.0)
+
+    # Normalize
+    print("[DEBUG] Raw delays:", sum(delays))
+    total = sum(delays)
+    delays = [(d / total) * (time_seconds - SAFETY_PAUSE * 2) for d in delays]
+    print("[DEBUG] Normalized delays:", sum(delays))
+
+    for char, delay in zip(url, delays):
+        pyautogui.typewrite(char)
+        time.sleep(delay)
+
+    pyautogui.press('enter')
 
 def click(x: int, y: int, delay: float = 0.1):
     """
@@ -118,5 +156,3 @@ def open_in_firefox(url: str):
         print("[ERROR] Firefox command not found. Adjust BROWSER_CMD.")
     except Exception as e:
         print(f"[ERROR] Failed to open URL: {e}")
-
-moveMouse(0, 0, duration=0.5)  # Move mouse to a safe position on module load
