@@ -85,13 +85,13 @@ def is_valid_doom_url(url: str) -> bool:
     # Match against each pattern
     if re.match(youtube_pattern, url):
         print("[VALID] YouTube Shorts URL detected.")
-        return True # add proper short form content and like count check
+        return valid_like_count(url, "youtube") # add proper short form content and like count check
     elif re.match(instagram_pattern, url):
         print("[VALID] Instagram Reels URL detected.")
-        return True
+        return valid_like_count(url, "instagram")
     elif re.match(tiktok_pattern, url):
         print("[VALID] TikTok URL detected.")
-        return True
+        return valid_like_count(url, "tiktok")
     
     print("[INVALID] URL is not a valid Doomscroll source.")
     return False
@@ -141,8 +141,7 @@ def handle_vote_or_link(text: str):
                 write_chatter_down(chatter.l_count)
             chatter.save()
         
-    valid = is_valid_doom_url(msg)
-    if valid:
+    if is_valid_doom_url(msg):
         Link.create(url=msg, posted_by=chatter)
 
 
