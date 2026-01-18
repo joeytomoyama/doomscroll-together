@@ -110,6 +110,19 @@
     const t = video.currentTime;
     const d = video.duration;
 
+	// Create/update progress display element
+	let progressDisplay = document.getElementById("loop-detector-progress");
+	if (!progressDisplay) {
+		progressDisplay = document.createElement("div");
+		progressDisplay.id = "loop-detector-progress";
+		progressDisplay.style.cssText =
+			"position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: #fff; padding: 8px 12px; border-radius: 4px; font-size: 14px; z-index: 9999; font-family: Arial, sans-serif;";
+		document.body.appendChild(progressDisplay);
+	}
+
+	const percentage = Math.round((t / d) * 100);
+	progressDisplay.textContent = `${percentage}%`;
+
     if (!d || d === Infinity) {
       lastTime = t;
       return;
@@ -118,7 +131,7 @@
     sendProgressToFlask(t, d);
 
     // LOOP DETECTED: currentTime dropped
-    if (t > 2 && t < lastTime - 0.5) { // used to be 0.05
+    if (t < lastTime - 0.5) { // used to be 0.05
       const now = Date.now();
       // Cooldown: prevent rapid double-advance
       const tooSoon = now - lastAdvanceAt < NEXT_COOLDOWN_MS;
