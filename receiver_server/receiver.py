@@ -26,16 +26,10 @@ def reset_votes():
     # drop whole Vote table
     Vote.delete().execute()
 
-@app.post("/sample")
-def sample():
-    data = request.get_json(force=True, silent=True) or {}
-    value = data.get("value")
-
+@app.post("/loop")
+def loop():
     timestamp = datetime.now().isoformat(timespec="seconds")
-    print(f"[{timestamp}] Received value from browser:", value)
-
-    if value != "loop":
-        return {"status": "ignored"}
+    print(f"[{timestamp}] Received loop from browser")
 
     store.CURRENT_CHATTER = None
     link = get_link()
@@ -43,7 +37,8 @@ def sample():
         print("[SAMPLE] No links available to open.")
         return {"status": "no_link"}
     
-    robot.open_in_firefox(link.url)
+    # robot.open_in_firefox(link.url)
+    robot.openURLLikeHuman(link.url)
     username = link.posted_by.username if link.posted_by else "unknown_user"
     print(f"[SAMPLE] Opening link: {link.url} posted by {username}")
     write_chatter(username)
@@ -52,22 +47,3 @@ def sample():
     reset_votes()
 
     return {"status": "ok"}
-
-@app.post("/progress")
-def progress():
-    data = request.get_json(force=True, silent=True) or {}
-    currentTime = data.get("currentTime")
-    duration = data.get("duration")
-
-    # if currentTime is None or duration is None:
-    #     return {"status": "ignored"}
-    
-    # print(f"[PROGRESS] {currentTime} / {duration}")
-
-    # if duration - currentTime <= 5.0:
-    #     reset_votes()
-    #     print("[VOTES] Votes reset for next link.")
-
-    return {"status": "ok"}
-
-# Removed if __name__ == "__main__" block - start from main.py instead

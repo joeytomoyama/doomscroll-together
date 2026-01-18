@@ -67,29 +67,29 @@ def openURLLikeHuman(url: str):#, time_seconds: float):
     pyautogui.hotkey('ctrl', 'l')
     time.sleep(SAFETY_PAUSE)
 
-    # Generate human-like delay weights (log-normal)
-    delays = [
-        random.lognormvariate(mu=-1.4, sigma=2.4)
-        for _ in range(char_count)
-    ]
+    # # Generate human-like delay weights (log-normal)
+    # delays = [
+    #     random.lognormvariate(mu=-1.4, sigma=2.4)
+    #     for _ in range(char_count)
+    # ]
 
-    # Occasional extreme pauses
-    for i in range(char_count):
-        if random.random() < 0.05:
-            delays[i] *= random.uniform(4.0, 6.0)
+    # # Occasional extreme pauses
+    # for i in range(char_count):
+    #     if random.random() < 0.05:
+    #         delays[i] *= random.uniform(4.0, 6.0)
 
-    # Normalize
-    print("[DEBUG] Raw delays:", sum(delays))
-    total = sum(delays)
-    delays = [(d / total) * (time_seconds - SAFETY_PAUSE * 2) for d in delays]
-    print("[DEBUG] Normalized delays:", sum(delays))
+    # # Normalize
+    # print("[DEBUG] Raw delays:", sum(delays))
+    # total = sum(delays)
+    # delays = [(d / total) * (time_seconds - SAFETY_PAUSE * 2) for d in delays]
+    # print("[DEBUG] Normalized delays:", sum(delays))
 
-    if (len(url) >= 36):
-        delays = [d * 0 for d in delays]  # speed up for long URLs
+    # if (len(url) >= 36):
+    #     delays = [d * 0 for d in delays]  # speed up for long URLs
 
-    for char, delay in zip(url, delays):
-        pyautogui.typewrite(char)
-        time.sleep(delay)
+    # for char, delay in zip(url, delays):
+    pyautogui.typewrite(url, interval=0.05)
+        # time.sleep(delay)
 
     pyautogui.press('enter')
 

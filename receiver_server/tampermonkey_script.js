@@ -21,21 +21,12 @@
   // -----------------------
   // SEND TO FLASK
   // -----------------------
-  function sendLoopToFlask(val) {
+  function sendLoopToFlask() {
     GM_xmlhttpRequest({
       method: "POST",
-      url: "http://127.0.0.1:5000/sample",
+      url: "http://127.0.0.1:5000/loop",
       headers: { "Content-Type": "application/json" },
-      data: JSON.stringify({ value: val }),
-    });
-  }
-
-  function sendProgressToFlask(currentTime, duration) {
-    GM_xmlhttpRequest({
-      method: "POST",
-      url: "http://127.0.0.1:5000/progress",
-      headers: { "Content-Type": "application/json" },
-      data: JSON.stringify({ currentTime: currentTime, duration: duration }),
+    //   data: JSON.stringify({ value: val }),
     });
   }
 
@@ -127,8 +118,6 @@
       lastTime = t;
       return;
     }
-
-    sendProgressToFlask(t, d);
 
     // LOOP DETECTED: currentTime dropped
     if (t < lastTime - 1) { // used to be 0.05
