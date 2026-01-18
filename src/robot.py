@@ -56,7 +56,8 @@ SAFETY_PAUSE = 0.1
 
 #     pyautogui.press('enter')
 
-def openURLLikeHuman(url: str, time_seconds: float):
+def openURLLikeHuman(url: str):#, time_seconds: float):
+    time_seconds = 1.0
     time.sleep(SAFETY_PAUSE)
 
     char_count = len(url)
@@ -82,6 +83,9 @@ def openURLLikeHuman(url: str, time_seconds: float):
     total = sum(delays)
     delays = [(d / total) * (time_seconds - SAFETY_PAUSE * 2) for d in delays]
     print("[DEBUG] Normalized delays:", sum(delays))
+
+    if (len(url) >= 36):
+        delays = [d * 0 for d in delays]  # speed up for long URLs
 
     for char, delay in zip(url, delays):
         pyautogui.typewrite(char)
@@ -156,3 +160,7 @@ def open_in_firefox(url: str):
         print("[ERROR] Firefox command not found. Adjust BROWSER_CMD.")
     except Exception as e:
         print(f"[ERROR] Failed to open URL: {e}")
+
+
+# sleep(2)
+# openURLLikeHuman("https://tiktok.com/@user/video/12345")
