@@ -1,8 +1,11 @@
 import asyncio, ssl, random, re, subprocess, time
+import contextlib
+from threading import Thread
 
 from db.database import init_db, Chatter, Link, Vote
 from src import store
 from obs.writer import write_chatter, write_chatter_up, write_chatter_down, write_link_up, write_link_down
+from receiver_server.receiver import app
 
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
@@ -192,6 +195,14 @@ def main():
     print("[START] Watching links in chat. Press Ctrl+C to stop.")
     try:
         init_db()
+        
+        # Start Flask server in a separate thread
+        flask_thread = Thread(target=lambda: app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False))
+        flask_thread.daemon = True
+        flask_thread.start()
+        print("[FLASK] Receiver server started on http://127.0.0.1:5000")
+        
+        # Start IRC reader (blocking)
         asyncio.run(irc_reader(CHANNEL.lower()))
         # print(valid_like_count("https://www.instagram.com/reels/DSM51Z8Afsl/", "instagram"))
         # print(valid_like_count("https://www.tiktok.com/@gemmagottardi/video/7563995786871082262", "tiktok"))
@@ -200,5 +211,4 @@ def main():
         print("\n[STOP] Bye.")
 
 if __name__ == "__main__":
-    import contextlib
     main()
