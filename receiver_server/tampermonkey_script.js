@@ -131,7 +131,7 @@
     sendProgressToFlask(t, d);
 
     // LOOP DETECTED: currentTime dropped
-    if (t < lastTime - 0.5) { // used to be 0.05
+    if (t < lastTime - 1) { // used to be 0.05
       const now = Date.now();
       // Cooldown: prevent rapid double-advance
       const tooSoon = now - lastAdvanceAt < NEXT_COOLDOWN_MS;

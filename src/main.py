@@ -77,13 +77,13 @@ def is_valid_doom_url(url: str) -> bool:
     # Define regex patterns for YouTube Shorts, Instagram Reels, and TikTok
 
     # YouTube can use either "youtube.com/shorts/..." or "youtu.be/..."
-    youtube_pattern = r'^(youtube\.com/shorts/[\w-]+|youtu\.be/[\w-]+)$'
+    youtube_pattern = r'^(youtube\.com/shorts/|youtu\.be/).+'
 
     # Instagram Reels URL pattern
-    instagram_pattern = r'^instagram\.com/reel/[\w-]+$'
+    instagram_pattern = r'^instagram\.com/reel/.+'
 
     # TikTok video URL pattern (with or without @username)
-    tiktok_pattern = r'^tiktok\.com/@[\w-]+/video/\d+$'
+    tiktok_pattern = r'^tiktok\.com/@[\w-]+/video/.+'
 
     # Match against each pattern
     if re.match(youtube_pattern, url):
