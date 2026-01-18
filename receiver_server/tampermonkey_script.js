@@ -133,7 +133,7 @@
 
       console.log("%c[LoopDetector] LOOP detected!", "color: #00b050");
 
-      sendLoopToFlask("loop");
+      sendLoopToFlask();
       clickNextPlatform();
 
       lastAdvanceAt = now;
