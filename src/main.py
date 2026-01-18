@@ -80,7 +80,8 @@ def is_valid_doom_url(url: str) -> bool:
     youtube_pattern = r'^(youtube\.com/shorts/|youtu\.be/).+'
 
     # Instagram Reels URL pattern
-    instagram_pattern = r'^instagram\.com/reel/.+'
+    # Accept both /reel/ and /reels/ forms
+    instagram_pattern = r'^instagram\.com/reels?/.+'
 
     # TikTok video URL pattern (with or without @username)
     tiktok_pattern = r'^tiktok\.com/@[\w-]+/video/.+'
