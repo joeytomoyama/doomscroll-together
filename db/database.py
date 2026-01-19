@@ -1,4 +1,4 @@
-from peewee import Model, SqliteDatabase, CharField, DateTimeField, ForeignKeyField, BooleanField, IntegerField
+from peewee import Model, SqliteDatabase, CharField, FloatField, ForeignKeyField, BooleanField, IntegerField
 import os
 import datetime
 
@@ -19,8 +19,8 @@ class Chatter(BaseModel):
 class Link(BaseModel):
     url = CharField()
     posted_by = ForeignKeyField(Chatter, backref='links', null=True)
-    posted_at = DateTimeField(default=datetime.datetime.now)
-    opened_at = DateTimeField(null=True, default=None)
+    posted_at = FloatField(default=lambda: datetime.datetime.now().timestamp())
+    opened_at = FloatField(null=True, default=None)
 
 class Vote(BaseModel):
     # link = ForeignKeyField(Link, backref='votes')

@@ -20,7 +20,7 @@ def get_link():
     else:
         # return the most recent link if no recent links
         print(f"[LINK] No recent links, choosing most recent link.")
-        return recent_links.order_by(Link.posted_at.desc()).first()
+        return Link.select().order_by(Link.posted_at.desc()).first()
     
 def reset_votes():
     # drop whole Vote table
