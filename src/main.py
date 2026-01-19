@@ -71,7 +71,7 @@ def valid_like_count(url: str, platform: str) -> bool:
 
 def is_valid_doom_url(url: str) -> bool:
     # Normalize URL: Remove "https://", "http://", and "www."
-    url = url.lower().strip()
+    url = url.strip()
     url = re.sub(r'^(https?://)?(www\.)?', '', url)  # Remove https:// or www.
 
     # Define regex patterns for YouTube Shorts, Instagram Reels, and TikTok
