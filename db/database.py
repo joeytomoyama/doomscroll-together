@@ -1,6 +1,6 @@
 from peewee import Model, SqliteDatabase, CharField, FloatField, ForeignKeyField, BooleanField, IntegerField
 import os
-import datetime
+import time
 
 # SQLite database connection - store in the db/ directory
 db_path = os.path.join(os.path.dirname(__file__), 'doomscroll.db')
@@ -19,7 +19,7 @@ class Chatter(BaseModel):
 class Link(BaseModel):
     url = CharField()
     posted_by = ForeignKeyField(Chatter, backref='links', null=True)
-    posted_at = FloatField(default=lambda: datetime.datetime.now().timestamp())
+    posted_at = FloatField(default=time.time)
     opened_at = FloatField(null=True, default=None)
 
 class Vote(BaseModel):
