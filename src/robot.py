@@ -64,7 +64,12 @@ def openURLLikeHuman(url: str):#, time_seconds: float):
     if char_count == 0 or time_seconds <= 0:
         return
 
+    # focus address bar and clear it
     pyautogui.hotkey('ctrl', 'l')
+    time.sleep(SAFETY_PAUSE)
+    pyautogui.hotkey('ctrl', 'a')
+    time.sleep(SAFETY_PAUSE)
+    pyautogui.press('backspace')
     time.sleep(SAFETY_PAUSE)
 
     # # Generate human-like delay weights (log-normal)
