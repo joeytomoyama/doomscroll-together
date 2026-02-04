@@ -2,13 +2,11 @@ from datetime import datetime
 import random
 import time
 
-from peewee import fn
-
 from flask import Flask, request # global flask installation
 
 from src import robot
 from src import store
-from db.database import Chatter, Link, Vote, db
+from db.database import Chatter, Link, Vote
 from obs.writer import write_chatter, write_chatter_up, write_chatter_down, write_link_up, write_link_down
 
 app = Flask(__name__)
@@ -17,30 +15,29 @@ def get_link():
     now = time.time()
     cutoff = now - 10
 
-    # Wrap selection and update in a single transaction to avoid races
-    with db.atomic():
-        # Prefer an unopened link from the last 10 seconds, picked at random in DB
+    # random link posted in last 10 seconds (recency bias)
+    recent_links = list(Link.select().where(
+        (Link.posted_at >= cutoff) & 
+        (Link.opened_at.is_null(True))
+    ))
+
+    if recent_links:
+        print(f"[LINK] Choosing from recent links.")
+        link = random.choice(recent_links)
+    else:
+        # return the most recent unopened link if no recent links
+        print(f"[LINK] No recent links, choosing most recent unopened link.")
         link = (
             Link.select()
-            .where((Link.posted_at >= cutoff) & (Link.opened_at.is_null(True)))
-            .order_by(fn.Random())
-            .limit(1)
+            .where(Link.opened_at.is_null(True))
+            .order_by(Link.posted_at.desc())
             .first()
         )
-
-        if not link:
-            # Fallback: most recent unopened link
-            link = (
-                Link.select()
-                .where(Link.opened_at.is_null(True))
-                .order_by(Link.posted_at.desc())
-                .first()
-            )
-
-        if link:
-            link.opened_at = now
-            link.save()
-            return link
+    
+    if link:
+        link.opened_at = now
+        link.save()
+        return link
     
 def reset_votes():
     # drop whole Vote table
