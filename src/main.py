@@ -177,6 +177,11 @@ async def irc_reader(channel: str):
                 return await irc_reader(channel)
 
             text = line.decode("utf-8", errors="ignore").strip()
+
+            if "RECONNECT" in text:
+                print("[IRC] Twitch requested reconnect.")
+                return await irc_reader(channel)
+            
             if text.startswith("PING"):
                 # Keepalive
                 pong = text.replace("PING", "PONG", 1)
@@ -185,8 +190,11 @@ async def irc_reader(channel: str):
                 continue
 
             # PRIVMSG format: :user!user@user.tmi.twitch.tv PRIVMSG #channel :message...
+            # if "PRIVMSG" in text:
+            #     handle_vote_or_link(text)
             if "PRIVMSG" in text:
-                handle_vote_or_link(text)
+                asyncio.get_running_loop().run_in_executor(None, handle_vote_or_link, text)
+
     finally:
         print("[IRC] Closing connection.")
         writer.close()
