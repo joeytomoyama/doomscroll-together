@@ -188,6 +188,7 @@ async def irc_reader(channel: str):
             if "PRIVMSG" in text:
                 handle_vote_or_link(text)
     finally:
+        print("[IRC] Closing connection.")
         writer.close()
         with contextlib.suppress(Exception):
             await writer.wait_closed()

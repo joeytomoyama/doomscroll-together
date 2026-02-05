@@ -71,6 +71,7 @@ def openURLLikeHuman(url: str):#, time_seconds: float):
     time.sleep(SAFETY_PAUSE)
     pyautogui.press('backspace')
     time.sleep(SAFETY_PAUSE)
+    time.sleep(SAFETY_PAUSE)
 
     # # Generate human-like delay weights (log-normal)
     # delays = [
