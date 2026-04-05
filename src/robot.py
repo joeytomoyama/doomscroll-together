@@ -5,6 +5,7 @@ import subprocess
 # import sleep
 from time import sleep
 import math
+from src import store
 
 BROWSER_CMD = ["firefox", "--new-tab"]
 # TODO: programmatically focus firefox with xdotool if needed
@@ -13,6 +14,10 @@ BROWSER_CMD = ["firefox", "--new-tab"]
 # pyautogui.FAILSAFE = True
 
 SAFETY_PAUSE = 0.1
+
+
+def is_dev_mode() -> bool:
+    return bool(getattr(store, "DEV", False))
 
 
 # def openURLLikeHuman(url: str, time_seconds: float):
@@ -29,7 +34,7 @@ SAFETY_PAUSE = 0.1
 #         return
 
 #     # Focus address bar
-#     pyautogui.hotkey('ctrl', 'l')
+#     hotkey('ctrl', 'l')
 #     time.sleep(0.2)
 
 #     # --- Generate human-like random delays ---
@@ -54,7 +59,7 @@ SAFETY_PAUSE = 0.1
 #         time.sleep(delay)
 #         print(delay)
 
-#     pyautogui.press('enter')
+#     press('enter')
 
 def openURLLikeHuman(url: str):#, time_seconds: float):
     time_seconds = 1.0
@@ -65,12 +70,9 @@ def openURLLikeHuman(url: str):#, time_seconds: float):
         return
 
     # focus address bar and clear it
-    pyautogui.hotkey('ctrl', 'l')
-    time.sleep(SAFETY_PAUSE)
-    pyautogui.hotkey('ctrl', 'a')
-    time.sleep(SAFETY_PAUSE)
-    pyautogui.press('backspace')
-    time.sleep(SAFETY_PAUSE)
+    hotkey('ctrl', 'l')
+    hotkey('ctrl', 'a')
+    press('backspace')
     time.sleep(SAFETY_PAUSE)
 
     # # Generate human-like delay weights (log-normal)
@@ -94,46 +96,10 @@ def openURLLikeHuman(url: str):#, time_seconds: float):
     #     delays = [d * 0 for d in delays]  # speed up for long URLs
 
     # for char, delay in zip(url, delays):
-    pyautogui.typewrite(url, interval=0.05)
+    typewrite(url, interval=0.05)
         # time.sleep(delay)
 
-    pyautogui.press('enter')
-
-def click(x: int, y: int, delay: float = 0.1):
-    """
-    Click at coordinates with a delay.
-    
-    Args:
-        x: X coordinate
-        y: Y coordinate
-        delay: Delay before clicking (for human-like behavior)
-    """
-    time.sleep(delay)
-    pyautogui.click(x, y)
-
-
-def moveMouse(x: int, y: int, duration: float = 0.5):
-    """
-    Move mouse to coordinates over a duration.
-    
-    Args:
-        x: Target X coordinate
-        y: Target Y coordinate
-        duration: Time to take moving the mouse
-    """
-    pyautogui.moveTo(x, y, duration=duration)
-
-
-def typeText(text: str, interval: float = 0.05):
-    """
-    Type text at a consistent speed.
-    
-    Args:
-        text: Text to type
-        interval: Delay between characters
-    """
-    time.sleep(SAFETY_PAUSE)
-    pyautogui.typewrite(text, interval=interval)
+    press('enter')
 
 
 def press(key: str):
@@ -144,6 +110,9 @@ def press(key: str):
         key: Key name (e.g., 'enter', 'tab', 'escape')
     """
     time.sleep(SAFETY_PAUSE)
+    if is_dev_mode():
+        print(f"[DEV][press] {key}")
+        return
     pyautogui.press(key)
 
 
@@ -155,7 +124,25 @@ def hotkey(*keys):
         *keys: Key names (e.g., 'ctrl', 'c')
     """
     time.sleep(SAFETY_PAUSE)
+    if is_dev_mode():
+        print(f"[DEV][hotkey] {' + '.join(keys)}")
+        return
     pyautogui.hotkey(*keys)
+
+
+def typewrite(text: str, interval: float = 0.1):
+    """
+    Type out text with a delay between characters.
+    
+    Args:
+        text: The string to type.
+        interval: Delay in seconds between each character.
+    """
+    time.sleep(SAFETY_PAUSE)
+    if is_dev_mode():
+        print(f"[DEV][typewrite] {text}")
+        return
+    pyautogui.typewrite(text, interval=interval)
 
 
 def open_in_firefox(url: str):

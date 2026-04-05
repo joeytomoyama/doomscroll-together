@@ -1,3 +1,4 @@
+import argparse
 import asyncio, ssl, random, re, subprocess, time
 import contextlib
 from threading import Thread
@@ -18,6 +19,12 @@ CHANNEL = "doomscrolltogether"  # <-- no leading '#'
 
 HOST = "irc.chat.twitch.tv"
 PORT = 6697  # TLS
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run doomscroll-together listener")
+    parser.add_argument("--dev", default=False, action="store_true", help="Enable development mode")
+    return parser.parse_args()
 
 
 def valid_like_count(url: str, platform: str) -> bool:
@@ -190,10 +197,10 @@ async def irc_reader(channel: str):
                 continue
 
             # PRIVMSG format: :user!user@user.tmi.twitch.tv PRIVMSG #channel :message...
-            # if "PRIVMSG" in text:
-            #     handle_vote_or_link(text)
             if "PRIVMSG" in text:
-                asyncio.get_running_loop().run_in_executor(None, handle_vote_or_link, text)
+                handle_vote_or_link(text)
+            # if "PRIVMSG" in text:
+                # asyncio.get_running_loop().run_in_executor(None, handle_vote_or_link, text)
 
     finally:
         print("[IRC] Closing connection.")
@@ -202,6 +209,10 @@ async def irc_reader(channel: str):
             await writer.wait_closed()
 
 def main():
+    args = parse_args()
+    store.DEV = args.dev
+    print(args.dev)
+
     print("[START] Watching links in chat. Press Ctrl+C to stop.")
     try:
         init_db()

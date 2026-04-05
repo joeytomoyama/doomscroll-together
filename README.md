@@ -18,6 +18,9 @@ source .venv/bin/activate
 python3 -m src.main
 # or with uv:
 uv run python3 -m src.main
+
+# dev mode (extra debugging behavior)
+python3 -m src.main --dev
 ```
 
 **Start the receiver Flask server:**
