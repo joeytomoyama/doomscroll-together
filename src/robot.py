@@ -19,48 +19,6 @@ SAFETY_PAUSE = 0.1
 def is_dev_mode() -> bool:
     return bool(getattr(store, "DEV", False))
 
-
-# def openURLLikeHuman(url: str, time_seconds: float):
-#     """
-#     Type out a URL with human-like inconsistency.
-
-#     The typing speed varies throughout, with pauses between characters,
-#     but the total typing time equals time_seconds.
-#     """
-#     time.sleep(SAFETY_PAUSE)
-
-#     char_count = len(url)
-#     if char_count == 0 or time_seconds <= 0:
-#         return
-
-#     # Focus address bar
-#     hotkey('ctrl', 'l')
-#     time.sleep(0.2)
-
-#     # --- Generate human-like random delays ---
-#     # Base random weights (not yet time-based)
-#     delays = []
-#     for _ in range(char_count):
-#         weight = random.uniform(0.1, 3.0)
-
-#         # Occasional thinking pause
-#         if random.random() < 0.1:
-#             weight *= random.uniform(5.0, 8.0)
-
-#         delays.append(weight)
-
-#     # Normalize delays so total equals time_seconds
-#     total_weight = sum(delays)
-#     delays = [(d / total_weight) * time_seconds for d in delays]
-
-#     # --- Type characters with computed delays ---
-#     for char, delay in zip(url, delays):
-#         pyautogui.typewrite(char)   # no internal interval
-#         time.sleep(delay)
-#         print(delay)
-
-#     press('enter')
-
 def openURLLikeHuman(url: str):#, time_seconds: float):
     time_seconds = 1.0
     time.sleep(SAFETY_PAUSE)

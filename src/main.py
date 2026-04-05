@@ -20,6 +20,11 @@ CHANNEL = "doomscrolltogether"  # <-- no leading '#'
 HOST = "irc.chat.twitch.tv"
 PORT = 6697  # TLS
 
+# ====================
+YOUTUBE = "youtube"
+INSTAGRAM = "instagram"
+TIKTOK = "tiktok"
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run doomscroll-together listener")
@@ -46,7 +51,7 @@ def valid_like_count(url: str, platform: str) -> bool:
     }
 
     # Instagram benefits greatly from cookies
-    if platform == "instagram":
+    if platform == INSTAGRAM:
         ydl_opts["cookiesfrombrowser"] = ("firefox",) # type: ignore
 
     try:
@@ -76,7 +81,7 @@ def valid_like_count(url: str, platform: str) -> bool:
     return True
 
 
-def is_valid_doom_url(url: str) -> bool:
+def is_valid_doom_url(url: str) -> str | None:
     # Normalize URL: Remove "https://", "http://", and "www."
     url = url.strip()
     url = re.sub(r'^(https?://)?(www\.)?', '', url)  # Remove https:// or www.
@@ -96,16 +101,19 @@ def is_valid_doom_url(url: str) -> bool:
     # Match against each pattern
     if re.match(youtube_pattern, url):
         print("[VALID] YouTube Shorts URL detected.")
-        return valid_like_count(url, "youtube") # add proper short form content and like count check
+        # return valid_like_count(url, "youtube") # add proper short form content and like count check
+        return YOUTUBE
     elif re.match(instagram_pattern, url):
         print("[VALID] Instagram Reels URL detected.")
-        return valid_like_count(url, "instagram")
+        # return valid_like_count(url, "instagram")
+        return INSTAGRAM
     elif re.match(tiktok_pattern, url):
         print("[VALID] TikTok URL detected.")
-        return valid_like_count(url, "tiktok")
+        # return valid_like_count(url, "tiktok")
+        return TIKTOK
     
     print("[INVALID] URL is not a valid Doomscroll source.")
-    return False
+    return None
 
 def get_twitch_value(raw, key):
     try:
@@ -151,9 +159,16 @@ def handle_vote_or_link(text: str):
                 print(f"[VOTE] {chatter.username} voted L (total L: {chatter.l_count})")
                 write_chatter_down(chatter.l_count)
             chatter.save()
-        
-    if is_valid_doom_url(msg):
-        Link.create(url=msg, posted_by=chatter)
+    
+    platform = is_valid_doom_url(msg)
+    if not platform:
+        print(f"[INVALID] {chatter.username}: {msg}")
+        return
+    
+    # if not valid_like_count(msg, platform):
+    #     return
+    # if is_valid_doom_url(msg):
+    Link.create(url=msg, posted_by=chatter)
 
 
 async def irc_reader(channel: str):

@@ -21,6 +21,7 @@ class Link(BaseModel):
     posted_by = ForeignKeyField(Chatter, backref='links', null=True)
     posted_at = FloatField(default=time.time)
     opened_at = FloatField(null=True, default=None)
+    validated = BooleanField(default=False)
 
 class Vote(BaseModel):
     # link = ForeignKeyField(Link, backref='votes')
