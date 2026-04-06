@@ -213,7 +213,8 @@ async def irc_reader(channel: str):
 
             # PRIVMSG format: :user!user@user.tmi.twitch.tv PRIVMSG #channel :message...
             if "PRIVMSG" in text:
-                handle_vote_or_link(text)
+                # handle_vote_or_link(text)
+                print(text)
             # if "PRIVMSG" in text:
                 # asyncio.get_running_loop().run_in_executor(None, handle_vote_or_link, text)
 

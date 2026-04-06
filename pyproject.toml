@@ -8,5 +8,6 @@ dependencies = [
     "flask>=3.1.2",
     "peewee>=3.18.3",
     "pyautogui",
+    "twitchio>=3.2.1",
     "yt-dlp>=2025.12.8",
 ]

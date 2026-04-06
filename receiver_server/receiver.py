@@ -11,14 +11,20 @@ from obs.writer import write_chatter, write_chatter_up, write_chatter_down, writ
 
 app = Flask(__name__)
 
+def print_links():
+    print("[LINKS] Current links in database including opened, validated, and all:")
+    for link in Link.select():
+        print(f"  - {link.url} (posted by {link.posted_by.username if link.posted_by else 'unknown'}, opened_at={datetime.fromtimestamp(link.opened_at) if link.opened_at else 'not opened'}, validated={link.validated})")
+
 def get_link():
     now = time.time()
-    cutoff = now - 10
+    cutoff = now - 60
 
-    # random link posted in last 10 seconds (recency bias)
+    # random link posted in last 60 seconds (recency bias)
     recent_links = list(Link.select().where(
         (Link.posted_at >= cutoff) & 
         (Link.opened_at.is_null(True))
+        # TODO: add validated flag
     ))
 
     if recent_links:
@@ -37,6 +43,7 @@ def get_link():
     if link:
         link.opened_at = now
         link.save()
+        print_links()
         return link
     
 def reset_votes():
