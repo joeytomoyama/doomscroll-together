@@ -144,3 +144,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 db/doomscroll.db
+tokens.db
+tokens.db-shm
+tokens.db-wal
+.tio.tokens.json
