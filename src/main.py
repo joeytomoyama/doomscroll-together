@@ -1,251 +1,340 @@
-import argparse
-import asyncio, ssl, random, re, subprocess, time
-import contextlib
+"""An example of connecting to a conduit and subscribing to EventSub when a User Authorizes the application.
+
+This bot can be restarted as many times without needing to subscribe or worry about tokens:
+- Tokens are stored in '.tio.tokens.json' by default
+- Subscriptions last 72 hours after the bot is disconnected and refresh when the bot starts.
+
+Consider reading through the documentation for AutoBot for more in depth explanations.
+"""
+
+import os, time, re, logging, asyncio, random
+from typing import TYPE_CHECKING
 from threading import Thread
+
+import twitchio
+from twitchio import eventsub
+from twitchio.ext import commands
+import asqlite
+from dotenv import load_dotenv
+from yt_dlp import YoutubeDL
+from yt_dlp.utils import DownloadError
 
 from db.database import init_db, Chatter, Link, Vote
 from src import store
 from obs.writer import write_chatter, write_chatter_up, write_chatter_down, write_link_up, write_link_down
 from receiver_server.receiver import app
 
-from yt_dlp import YoutubeDL
-from yt_dlp.utils import DownloadError
-import time
-
-# ====== CONFIG ======
-CHANNEL = "doomscrolltogether"  # <-- no leading '#'
-
-# ====================
-
-HOST = "irc.chat.twitch.tv"
-PORT = 6697  # TLS
-
-# ====================
-YOUTUBE = "youtube"
-INSTAGRAM = "instagram"
-TIKTOK = "tiktok"
+load_dotenv()
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Run doomscroll-together listener")
-    parser.add_argument("--dev", default=False, action="store_true", help="Enable development mode")
-    return parser.parse_args()
+if TYPE_CHECKING:
+    import sqlite3
 
 
-def valid_like_count(url: str, platform: str) -> bool:
-    """
-    Returns True if the video passes the like threshold
-    (anti self-promo filter), False otherwise.
+LOGGER: logging.Logger = logging.getLogger("Bot")
 
-    platform: "youtube", "tiktok", or "instagram"
-    """
+# Consider using a .env or another form of Configuration file!
+CLIENT_ID = os.getenv("CLIENT_ID")  # The CLIENT ID from the Twitch Dev Console
+CLIENT_SECRET = os.getenv("CLIENT_SECRET")  # The CLIENT SECRET from the Twitch Dev Console
+BOT_ID = os.getenv("BOT_ID")  # The Account ID of the bot user...
+OWNER_ID = os.getenv("OWNER_ID")  # Your personal User ID..
 
-    MIN_LIKES = 5000
-    MIN_AGE_HOURS = 6  # optional but recommended
+class Bot(commands.AutoBot):
+    def __init__(self, *, token_database: asqlite.Pool, subs: list[eventsub.SubscriptionPayload]) -> None:
+        self.token_database = token_database
 
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        # "runtime": ["node"],
-    }
+        if CLIENT_ID is None or CLIENT_SECRET is None or BOT_ID is None or OWNER_ID is None:
+            raise ValueError("CLIENT_ID, CLIENT_SECRET, BOT_ID, and OWNER_ID must be set in the environment variables.")
 
-    # Instagram benefits greatly from cookies
-    if platform == INSTAGRAM:
-        ydl_opts["cookiesfrombrowser"] = ("firefox",) # type: ignore
+        super().__init__(
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+            bot_id=BOT_ID,
+            owner_id=OWNER_ID,
+            prefix="!",
+            subscriptions=subs,
+            force_subscribe=True,
+        )
 
-    try:
-        with YoutubeDL(ydl_opts) as ydl: # type: ignore
-            info = ydl.extract_info(url, download=False)
-    except DownloadError:
-        return False
+    async def setup_hook(self) -> None:
+        # Add our component which contains our commands...
+        await self.add_component(LinkProcessor(self))
 
-    likes = info.get("like_count")
-    timestamp = info.get("timestamp")
+    async def event_oauth_authorized(self, payload: twitchio.authentication.UserTokenPayload) -> None:
+        await self.add_token(payload.access_token, payload.refresh_token)
 
-    print(f"[CHECK] {platform.capitalize()} video has {likes} likes and timestamp {timestamp}.")
+        if not payload.user_id:
+            return
 
-    # Missing or invalid like count → fail
-    if not isinstance(likes, int):
-        return False
+        if payload.user_id == self.bot_id:
+            # We usually don't want subscribe to events on the bots channel...
+            return
 
-    if likes < MIN_LIKES:
-        return False
+        # A list of subscriptions we would like to make to the newly authorized channel...
+        subs: list[eventsub.SubscriptionPayload] = [
+            eventsub.ChatMessageSubscription(broadcaster_user_id=payload.user_id, user_id=self.bot_id),
+        ]
 
-    # Optional age gate (strongly recommended)
-    if timestamp:
-        age_hours = (time.time() - timestamp) / 3600
-        if age_hours < MIN_AGE_HOURS:
+        resp: twitchio.MultiSubscribePayload = await self.multi_subscribe(subs)
+        if resp.errors:
+            LOGGER.warning("Failed to subscribe to: %r, for user: %s", resp.errors, payload.user_id)
+
+    async def add_token(self, token: str, refresh: str) -> twitchio.authentication.ValidateTokenPayload:
+        # Make sure to call super() as it will add the tokens interally and return us some data...
+        resp: twitchio.authentication.ValidateTokenPayload = await super().add_token(token, refresh)
+
+        # Store our tokens in a simple SQLite Database when they are authorized...
+        query = """
+        INSERT INTO tokens (user_id, token, refresh)
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id)
+        DO UPDATE SET
+            token = excluded.token,
+            refresh = excluded.refresh;
+        """
+
+        async with self.token_database.acquire() as connection:
+            await connection.execute(query, (resp.user_id, token, refresh))
+
+        LOGGER.info("Added token to the database for user: %s", resp.user_id)
+        return resp
+
+    async def event_ready(self) -> None:
+        LOGGER.info("Successfully logged in as: %s", self.bot_id)
+
+
+class LinkProcessor(commands.Component):
+    # An example of a Component with some simple commands and listeners
+    # You can use Components within modules for a more organized codebase and hot-reloading.
+
+    INSTAGRAM = "instagram"
+    YOUTUBE = "youtube"
+    TIKTOK = "tiktok"
+
+    def __init__(self, bot: Bot) -> None:
+        # Passing args is not required...
+        # We pass bot here as an example...
+        self.bot = bot
+
+    def is_valid_url(self, url: str) -> str | None:
+        # Normalize URL: Remove "https://", "http://", and "www."
+        url = url.strip()
+        url = re.sub(r'^(https?://)?(www\.)?', '', url)  # Remove https:// or www.
+
+        # Define regex patterns for YouTube Shorts, Instagram Reels, and TikTok
+
+        # YouTube can use either "youtube.com/shorts/..." or "youtu.be/..."
+        youtube_pattern = r'^(youtube\.com/shorts/|youtu\.be/).+'
+
+        # Instagram Reels URL pattern
+        # Accept both /reel/ and /reels/ forms
+        instagram_pattern = r'^instagram\.com/reels?/.+'
+
+        # TikTok video URL pattern (with or without @username)
+        tiktok_pattern = r'^tiktok\.com/@[\w-]+/video/.+'
+
+        # Match against each pattern
+        if re.match(youtube_pattern, url):
+            print("[VALID] YouTube Shorts URL detected.")
+            # return valid_like_count(url, "youtube") # add proper short form content and like count check
+            return self.YOUTUBE
+        elif re.match(instagram_pattern, url):
+            print("[VALID] Instagram Reels URL detected.")
+            # return valid_like_count(url, "instagram")
+            return self.INSTAGRAM
+        elif re.match(tiktok_pattern, url):
+            print("[VALID] TikTok URL detected.")
+            # return valid_like_count(url, "tiktok")
+            return self.TIKTOK
+        
+        print("[INVALID] URL is not a valid Doomscroll source.")
+        return None
+
+    def is_valid_like_count(self, url: str, platform: str) -> bool:
+        """
+        Returns True if the video passes the like threshold
+        (anti self-promo filter), False otherwise.
+
+        platform: "youtube", "tiktok", or "instagram"
+        """
+
+        MIN_LIKES = 5000
+        MIN_AGE_HOURS = 6  # optional but recommended
+
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            # "runtime": ["node"],
+        }
+
+        # Instagram benefits greatly from cookies
+        if platform == self.INSTAGRAM:
+            ydl_opts["cookiesfrombrowser"] = ("firefox",) # type: ignore
+
+        try:
+            with YoutubeDL(ydl_opts) as ydl: # type: ignore
+                info = ydl.extract_info(url, download=False)
+        except DownloadError:
             return False
 
-    return True
+        likes = info.get("like_count")
+        timestamp = info.get("timestamp")
+
+        print(f"[CHECK] {platform.capitalize()} video has {likes} likes and timestamp {timestamp}.")
+
+        # Missing or invalid like count → fail
+        if not isinstance(likes, int):
+            return False
+
+        if likes < MIN_LIKES:
+            return False
+
+        # Optional age gate (strongly recommended)
+        if timestamp:
+            age_hours = (time.time() - timestamp) / 3600
+            if age_hours < MIN_AGE_HOURS:
+                return False
+
+        return True
+
+    # An example of listening to an event
+    # We use a listener in our Component to display the messages received.
+    @commands.Component.listener()
+    async def event_message(self, payload: twitchio.ChatMessage) -> None:
+        print(f"[{payload.broadcaster.name}] - {payload.chatter.name}: {payload.text}")
 
 
-def is_valid_doom_url(url: str) -> str | None:
-    # Normalize URL: Remove "https://", "http://", and "www."
-    url = url.strip()
-    url = re.sub(r'^(https?://)?(www\.)?', '', url)  # Remove https:// or www.
+    @commands.command()
+    async def hi(self, ctx: commands.Context) -> None:
+        """Command that replies to the invoker with Hi <name>!
 
-    # Define regex patterns for YouTube Shorts, Instagram Reels, and TikTok
+        !hi
+        """
+        await ctx.reply(f"Hi {ctx.chatter}!")
 
-    # YouTube can use either "youtube.com/shorts/..." or "youtu.be/..."
-    youtube_pattern = r'^(youtube\.com/shorts/|youtu\.be/).+'
+    @commands.command()
+    async def link(self, ctx: commands.Context, *, message: str) -> None:
+        """Command processes and saves a doom link
 
-    # Instagram Reels URL pattern
-    # Accept both /reel/ and /reels/ forms
-    instagram_pattern = r'^instagram\.com/reels?/.+'
+        !link
+        """
+        platform = self.is_valid_url(message)
+        if not platform:
+            await ctx.reply("Sorry, that doesn't look like a valid YouTube Shorts, Instagram Reels, or TikTok URL.")
+            return
 
-    # TikTok video URL pattern (with or without @username)
-    tiktok_pattern = r'^tiktok\.com/@[\w-]+/video/.+'
-
-    # Match against each pattern
-    if re.match(youtube_pattern, url):
-        print("[VALID] YouTube Shorts URL detected.")
-        # return valid_like_count(url, "youtube") # add proper short form content and like count check
-        return YOUTUBE
-    elif re.match(instagram_pattern, url):
-        print("[VALID] Instagram Reels URL detected.")
-        # return valid_like_count(url, "instagram")
-        return INSTAGRAM
-    elif re.match(tiktok_pattern, url):
-        print("[VALID] TikTok URL detected.")
-        # return valid_like_count(url, "tiktok")
-        return TIKTOK
-    
-    print("[INVALID] URL is not a valid Doomscroll source.")
-    return None
-
-def get_twitch_value(raw, key):
-    try:
-        tag_section = raw.split(' ', 1)[0]
-        for tag in tag_section.lstrip('@').split(';'):
-            if tag.startswith(key + "="):
-                return tag.split("=", 1)[1]
-    except IndexError:
-        pass
-    return None
-
-def get_twitch_msg(raw):
-    try:
-        return raw.split("PRIVMSG", 1)[1].split(":", 1)[1]
-    except IndexError:
-        return ""
-
-def handle_vote_or_link(text: str):
-    username = get_twitch_value(text, "display-name") or "unknown_user"
-    user_id = get_twitch_value(text, "user-id") or ""
-    msg = get_twitch_msg(text).strip()
-
-    # get chatter from db
-    chatter = Chatter.get_or_create(username=username, defaults={'user_id': user_id})[0]
-    print(f"[CHATTER] {chatter.username} (W:{chatter.w_count} L:{chatter.l_count})")
-
-    # check if vote
-    if msg.lower() == "w" or msg.lower() == "l":
-        if not store.ACTIVE:
-            print(f"[VOTE] Ignored vote from {chatter.username} because not ACTIVE.")
+        if not self.is_valid_like_count(message, platform):
+            await ctx.reply("Sorry, video must exist and have at least 5000 likes.")
             return
         
-        is_upvote = msg.lower() == "w"
-        vote, created = Vote.get_or_create(chatter=chatter, defaults={'is_upvote': is_upvote})
-        # update chatter's w_count or l_count
-        if created:
-            if is_upvote:
-                chatter.w_count += 1
-                print(f"[VOTE] {chatter.username} voted W (total W: {chatter.w_count})")
-                write_chatter_up(chatter.w_count)
-            else:
-                chatter.l_count += 1
-                print(f"[VOTE] {chatter.username} voted L (total L: {chatter.l_count})")
-                write_chatter_down(chatter.l_count)
-            chatter.save()
-    
-    platform = is_valid_doom_url(msg)
-    if not platform:
-        print(f"[INVALID] {chatter.username}: {msg}")
-        return
-    
-    # if not valid_like_count(msg, platform):
-    #     return
-    # if is_valid_doom_url(msg):
-    Link.create(url=msg, posted_by=chatter)
+        await ctx.reply(f"Successfully added {platform.capitalize()} link!")
 
 
-async def irc_reader(channel: str):
-    ctx = ssl.create_default_context()
-    reader, writer = await asyncio.open_connection(HOST, PORT, ssl=ctx)
+async def setup_database(db: asqlite.Pool) -> tuple[list[tuple[str, str]], list[eventsub.SubscriptionPayload]]:
+    # Create our token table, if it doesn't exist..
+    # You should add the created files to .gitignore or potentially store them somewhere safer
+    # This is just for example purposes...
 
-    anon_suffix = random.randint(10000, 99999)
-    nick = f"justinfan{anon_suffix}"
+    query = """CREATE TABLE IF NOT EXISTS tokens(user_id TEXT PRIMARY KEY, token TEXT NOT NULL, refresh TEXT NOT NULL)"""
+    async with db.acquire() as connection:
+        await connection.execute(query)
 
-    # Request Twitch capabilities (tags/commands help, but not required to just read).
-    def send(cmd: str):
-        writer.write((cmd + "\r\n").encode("utf-8"))
+        # Fetch any existing tokens...
+        rows: list[sqlite3.Row] = await connection.fetchall("""SELECT * from tokens""")
 
-    # Anonymous pattern: send PASS with any random string (or blank), and a 'justinfan' nick.
-    send(f"PASS justinfan{random.randint(1, 10**8)}")
-    send(f"NICK {nick}")
-    send("CAP REQ :twitch.tv/tags twitch.tv/commands")
-    send(f"JOIN #{channel}")
-    await writer.drain()
-    print(f"[IRC] Connected as {nick}. Joined #{channel}")
+        tokens: list[tuple[str, str]] = []
+        subs: list[eventsub.SubscriptionPayload] = []
 
-    try:
-        while True:
-            line = await reader.readline()
-            if not line:
-                print("[IRC] Disconnected (EOF). Reconnecting in 3s...")
-                await asyncio.sleep(3)
-                return await irc_reader(channel)
+        for row in rows:
+            tokens.append((row["token"], row["refresh"]))
 
-            text = line.decode("utf-8", errors="ignore").strip()
-
-            if "RECONNECT" in text:
-                print("[IRC] Twitch requested reconnect.")
-                return await irc_reader(channel)
-            
-            if text.startswith("PING"):
-                # Keepalive
-                pong = text.replace("PING", "PONG", 1)
-                send(pong)
-                await writer.drain()
+            if row["user_id"] == BOT_ID:
                 continue
 
-            # PRIVMSG format: :user!user@user.tmi.twitch.tv PRIVMSG #channel :message...
-            if "PRIVMSG" in text:
-                # handle_vote_or_link(text)
-                print(text)
-            # if "PRIVMSG" in text:
-                # asyncio.get_running_loop().run_in_executor(None, handle_vote_or_link, text)
+            subs.extend([eventsub.ChatMessageSubscription(broadcaster_user_id=row["user_id"], user_id=BOT_ID)])
 
-    finally:
-        print("[IRC] Closing connection.")
-        writer.close()
-        with contextlib.suppress(Exception):
-            await writer.wait_closed()
+    return tokens, subs
 
-def main():
-    args = parse_args()
-    store.DEV = args.dev
-    print(args.dev)
 
-    print("[START] Watching links in chat. Press Ctrl+C to stop.")
+# Our main entry point for our Bot
+# Best to setup_logging here, before anything starts
+def main() -> None:
+    twitchio.utils.setup_logging(level=logging.INFO)
+
+    async def runner() -> None:
+        async with asqlite.create_pool("tokens.db") as tdb:
+            tokens, subs = await setup_database(tdb)
+
+            async with Bot(token_database=tdb, subs=subs) as bot:
+                for pair in tokens:
+                    await bot.add_token(*pair)
+
+                await bot.start(load_tokens=False)
+
     try:
-        init_db()
-        
-        # Start Flask server in a separate thread
-        flask_thread = Thread(target=lambda: app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False))
-        flask_thread.daemon = True
-        flask_thread.start()
-        print("[FLASK] Receiver server started on http://127.0.0.1:5000")
-        
-        # Start IRC reader (blocking)
-        asyncio.run(irc_reader(CHANNEL.lower()))
-        # print(valid_like_count("https://www.instagram.com/reels/DSM51Z8Afsl/", "instagram"))
-        # print(valid_like_count("https://www.tiktok.com/@gemmagottardi/video/7563995786871082262", "tiktok"))
-        # print(valid_like_count("https://www.youtube.com/shorts/520JzVVudaI", "youtube"))
+        asyncio.run(runner())
     except KeyboardInterrupt:
-        print("\n[STOP] Bye.")
+        LOGGER.warning("Shutting down due to KeyboardInterrupt")
+
 
 if __name__ == "__main__":
     main()
+
+
+    # EXAMPLE COMMANDS
+    # @commands.command()
+    # async def say(self, ctx: commands.Context, *, message: str) -> None:
+    #     """Command which repeats what the invoker sends.
+
+    #     !say <message>
+    #     """
+    #     await ctx.send(message)
+
+    # @commands.command()
+    # async def add(self, ctx: commands.Context, left: int, right: int) -> None:
+    #     """Command which adds to integers together.
+
+    #     !add <number> <number>
+    #     """
+    #     await ctx.reply(f"{left} + {right} = {left + right}")
+
+    # @commands.command()
+    # async def choice(self, ctx: commands.Context, *choices: str) -> None:
+    #     """Command which takes in an arbitrary amount of choices and randomly chooses one.
+
+    #     !choice <choice_1> <choice_2> <choice_3> ...
+    #     """
+    #     await ctx.reply(f"You provided {len(choices)} choices, I choose: {random.choice(choices)}")
+
+    # @commands.command(aliases=["thanks", "thank"])
+    # async def give(self, ctx: commands.Context, user: twitchio.User, amount: int, *, message: str | None = None) -> None:
+    #     """A more advanced example of a command which has makes use of the powerful argument parsing, argument converters and
+    #     aliases.
+
+    #     The first argument will be attempted to be converted to a User.
+    #     The second argument will be converted to an integer if possible.
+    #     The third argument is optional and will consume the reast of the message.
+
+    #     !give <@user|user_name> <number> [message]
+    #     !thank <@user|user_name> <number> [message]
+    #     !thanks <@user|user_name> <number> [message]
+    #     """
+    #     msg = f"with message: {message}" if message else ""
+    #     await ctx.send(f"{ctx.chatter.mention} gave {amount} thanks to {user.mention} {msg}")
+
+    # @commands.group(invoke_fallback=True)
+    # async def socials(self, ctx: commands.Context) -> None:
+    #     """Group command for our social links.
+
+    #     !socials
+    #     """
+    #     await ctx.send("discord.gg/..., youtube.com/..., twitch.tv/...")
+
+    # @socials.command(name="discord")
+    # async def socials_discord(self, ctx: commands.Context) -> None:
+    #     """Sub command of socials that sends only our discord invite.
+
+    #     !socials discord
+    #     """
+    #     await ctx.send("discord.gg/...")
