@@ -11,8 +11,8 @@ class BaseModel(Model):
         database = db
 
 class Chatter(BaseModel):
-    username = CharField(unique=True)
-    user_id = CharField(null=True)
+    user_id = CharField(unique=True)
+    username = CharField()
     w_count = IntegerField(default=0)
     l_count = IntegerField(default=0)
 
@@ -21,7 +21,7 @@ class Link(BaseModel):
     posted_by = ForeignKeyField(Chatter, backref='links', null=True)
     posted_at = FloatField(default=time.time)
     opened_at = FloatField(null=True, default=None)
-    validated = BooleanField(default=False)
+    # validated = BooleanField(default=False)
 
 class Vote(BaseModel):
     # link = ForeignKeyField(Link, backref='votes')

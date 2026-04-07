@@ -198,6 +198,17 @@ class LinkProcessor(commands.Component):
 
         return True
 
+    def is_link_played_recently(self, url: str) -> bool:
+        RECENCY_THRESHOLD = 60 * 60 * 2 # 2 hour
+
+        recent_links = Link.select().where(
+            (Link.url == url) &
+            (Link.opened_at.is_null(False)) &
+            (Link.posted_at >= time.time() - RECENCY_THRESHOLD)
+        )
+
+        return recent_links.exists()
+
     # An example of listening to an event
     # We use a listener in our Component to display the messages received.
     @commands.Component.listener()
@@ -219,16 +230,49 @@ class LinkProcessor(commands.Component):
 
         !link
         """
+
+        # check type of ctx.payload if it is a message
+        if not isinstance(ctx.payload, twitchio.ChatMessage):
+            print("[ERROR] Received !link command with non-ChatMessage payload.")
+            return
+        
         platform = self.is_valid_url(message)
         if not platform:
-            await ctx.reply("Sorry, that doesn't look like a valid YouTube Shorts, Instagram Reels, or TikTok URL.")
+            await ctx.reply("Sorry, that doesn't look like a valid Shorts, Reels, or TikTok URL.")
             return
 
         if not self.is_valid_like_count(message, platform):
             await ctx.reply("Sorry, video must exist and have at least 5000 likes.")
             return
+
+        # if self.is_link_played_recently(message):
+        #     await ctx.reply("Sorry, that link or a duplicate has been played recently. Please try again later.")
+        #     return
+
+        chatter = Chatter.get_or_create(user_id=ctx.chatter.id, defaults={"username": ctx.chatter.name})[0]
+        Link.create(url=message, posted_by=chatter)
+
+        print("chatter", ctx.chatter.name)
+        print("chatter id", ctx.chatter.id)
+        print("message", message)
         
         await ctx.reply(f"Successfully added {platform.capitalize()} link!")
+
+    @commands.command()
+    async def w(self, ctx: commands.Context) -> None:
+        """Command that replies to the invoker with Hi <name>!
+
+        !w
+        """
+        # detect W
+
+    @commands.command()
+    async def l(self, ctx: commands.Context) -> None:
+        """Command that replies to the invoker with Hi <name>!
+
+        !l
+        """
+        # detect L
 
 
 async def setup_database(db: asqlite.Pool) -> tuple[list[tuple[str, str]], list[eventsub.SubscriptionPayload]]:
