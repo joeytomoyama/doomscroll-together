@@ -55,7 +55,7 @@ class Bot(commands.AutoBot):
 
     async def setup_hook(self) -> None:
         # Add our component which contains our commands...
-        await self.add_component(MyComponent(self))
+        await self.add_component(LinkProcessor(self))
 
     async def event_oauth_authorized(self, payload: twitchio.authentication.UserTokenPayload) -> None:
         await self.add_token(payload.access_token, payload.refresh_token)
@@ -100,7 +100,7 @@ class Bot(commands.AutoBot):
         LOGGER.info("Successfully logged in as: %s", self.bot_id)
 
 
-class MyComponent(commands.Component):
+class LinkProcessor(commands.Component):
     # An example of a Component with some simple commands and listeners
     # You can use Components within modules for a more organized codebase and hot-reloading.
 

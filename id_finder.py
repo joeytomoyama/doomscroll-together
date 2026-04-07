@@ -9,7 +9,7 @@ load_dotenv()
 CLIENT_ID = os.getenv("CLIENT_ID")
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 
-async def main() -> None:
+async def run() -> None:
     if CLIENT_ID is None or CLIENT_SECRET is None:
         print("Error: CLIENT_ID and CLIENT_SECRET must be set in the environment.")
         return
@@ -21,4 +21,4 @@ async def main() -> None:
             print(f"User: {u.name} - ID: {u.id}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(run())
