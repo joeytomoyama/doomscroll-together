@@ -7,7 +7,7 @@ This bot can be restarted as many times without needing to subscribe or worry ab
 Consider reading through the documentation for AutoBot for more in depth explanations.
 """
 
-import os, time, re, logging, asyncio, random
+import os, time, re, logging, asyncio, argparse, random
 from typing import TYPE_CHECKING
 from threading import Thread
 
@@ -38,6 +38,11 @@ CLIENT_ID = os.getenv("CLIENT_ID")  # The CLIENT ID from the Twitch Dev Console
 CLIENT_SECRET = os.getenv("CLIENT_SECRET")  # The CLIENT SECRET from the Twitch Dev Console
 BOT_ID = os.getenv("BOT_ID")  # The Account ID of the bot user...
 OWNER_ID = os.getenv("OWNER_ID")  # Your personal User ID..
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run doomscroll-together listener")
+    parser.add_argument("--dev", default=False, action="store_true", help="Enable development mode")
+    return parser.parse_args()
 
 class Bot(commands.AutoBot):
     def __init__(self, *, token_database: asqlite.Pool, subs: list[eventsub.SubscriptionPayload]) -> None:
@@ -276,6 +281,9 @@ class LinkProcessor(commands.Component):
 
 
 async def setup_database(db: asqlite.Pool) -> tuple[list[tuple[str, str]], list[eventsub.SubscriptionPayload]]:
+    # Initialize app tables for doomscroll.db
+    init_db()
+
     # Create our token table, if it doesn't exist..
     # You should add the created files to .gitignore or potentially store them somewhere safer
     # This is just for example purposes...
@@ -305,6 +313,17 @@ async def setup_database(db: asqlite.Pool) -> tuple[list[tuple[str, str]], list[
 # Best to setup_logging here, before anything starts
 def main() -> None:
     twitchio.utils.setup_logging(level=logging.INFO)
+
+    # parse args
+    args = parse_args()
+    if args.dev:
+        store.DEV = args.dev
+
+    # Start Flask server in a separate thread
+    flask_thread = Thread(target=lambda: app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False))
+    flask_thread.daemon = True
+    flask_thread.start()
+    print("[FLASK] Receiver server started on http://127.0.0.1:5000")
 
     async def runner() -> None:
         async with asqlite.create_pool("tokens.db") as tdb:

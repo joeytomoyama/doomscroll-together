@@ -14,7 +14,7 @@ app = Flask(__name__)
 def print_links():
     print("[LINKS] Current links in database including opened, validated, and all:")
     for link in Link.select():
-        print(f"  - {link.url} (posted by {link.posted_by.username if link.posted_by else 'unknown'}, opened_at={datetime.fromtimestamp(link.opened_at) if link.opened_at else 'not opened'}, validated={link.validated})")
+        print(f"  - {link.url} (posted by {link.posted_by.username if link.posted_by else 'unknown'}, opened_at={datetime.fromtimestamp(link.opened_at) if link.opened_at else 'not opened'})")#, validated={link.validated})")
 
 def get_link():
     now = time.time()
